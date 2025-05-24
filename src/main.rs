@@ -16,8 +16,6 @@ fn main() -> glib::ExitCode {
 
 fn build_ui(app: &Application) {
     let board = Board::new();
-    board.set_width_request(600);
-    board.set_height_request(800);
     let window = ApplicationWindow::builder()
         .application(app)
         .title("Simple chess dragging")

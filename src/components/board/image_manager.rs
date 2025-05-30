@@ -65,6 +65,10 @@ impl ImageManager {
     pub fn get_image_clone(&self) -> Pixbuf {
         self.image.clone()
     }
+
+    pub fn update_image_size(&mut self, size: u32) {
+        self.image = Self::generate_image(size);
+    }
 }
 
 impl Default for ImageManager {

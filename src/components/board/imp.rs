@@ -1,10 +1,10 @@
 use gtk::cairo;
 use gtk::gdk::prelude::GdkCairoContextExt;
 use gtk::glib;
-use gtk::prelude::{DrawingAreaExtManual, WidgetExt};
+use gtk::prelude::{DrawingAreaExt, DrawingAreaExtManual, WidgetExt};
 use gtk::subclass::prelude::*;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use super::image_manager::ImageManager;
 
@@ -14,8 +14,10 @@ const PERU: (f64, f64, f64) = (0.80, 0.52, 0.25);
 
 #[derive(Default)]
 pub struct Board {
-    image_manager: Arc<ImageManager>,
+    pub image_manager: Arc<Mutex<ImageManager>>,
 }
+
+impl Board {}
 
 #[glib::object_subclass]
 impl ObjectSubclass for Board {
@@ -33,6 +35,17 @@ impl ObjectImpl for Board {
         self.obj().set_draw_func(move |_area, ctx, width, height| {
             draw_content(ctx, width, height, Arc::clone(&image_manager))
         });
+
+        let board = Arc::new(Mutex::new(self.obj().clone()));
+        self.obj().connect_resize(move |_board, w, h| {
+            let width = w as u32;
+            let height = h as u32;
+            let minimum_size = width.min(height);
+            let cell_size = minimum_size as f64 / 2f64;
+            if let Ok(mut board) = board.lock() {
+                board.update_image_size(cell_size as u32);
+            }
+        });
     }
 }
 
@@ -40,7 +53,12 @@ impl WidgetImpl for Board {}
 
 impl DrawingAreaImpl for Board {}
 
-fn draw_content(ctx: &cairo::Context, width: i32, height: i32, image_manager: Arc<ImageManager>) {
+fn draw_content(
+    ctx: &cairo::Context,
+    width: i32,
+    height: i32,
+    image_manager: Arc<Mutex<ImageManager>>,
+) {
     let minimum_size = width.min(height);
     let cell_size = minimum_size as f64 / 2f64;
     draw_single_cell(ctx, 0.0, 0.0, cell_size as f64, NAVAJO_WHITE);
@@ -62,7 +80,8 @@ fn draw_single_cell(ctx: &cairo::Context, x: f64, y: f64, size: f64, color: (f64
     ctx.fill().expect("failed to fill cell");
 }
 
-fn draw_piece(ctx: &cairo::Context, x: f64, y: f64, image_manager: Arc<ImageManager>) {
+fn draw_piece(ctx: &cairo::Context, x: f64, y: f64, image_manager: Arc<Mutex<ImageManager>>) {
+    let image_manager = image_manager.lock().unwrap();
     let piece_pixbuf = image_manager.get_image_clone();
 
     ctx.save().unwrap();

@@ -1,4 +1,5 @@
 mod imp;
+mod image_manager;
 
 use glib::Object;
 use gtk::glib;

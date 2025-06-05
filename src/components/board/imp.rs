@@ -86,6 +86,12 @@ impl Board {
     }
 
     fn setup_drag_and_drop(&self) {
+        let (drag_source, drop_target) = self.setup_drag_drop_objects();
+        self.setup_drag_source_listener(drag_source);
+        self.setup_drop_target_listener(drop_target);
+    }
+
+    fn setup_drag_drop_objects(&self) -> (DragSource, DropTarget) {
         let drag_source = DragSource::builder()
             .actions(gtk::gdk::DragAction::MOVE)
             .build();
@@ -94,6 +100,16 @@ impl Board {
             .build();
         drop_target.set_types(&[Type::STRING]);
 
+        self.obj().set_drag_source(drag_source.clone());
+        self.obj().set_drop_target(drop_target.clone());
+
+        self.obj().add_controller(drag_source.clone());
+        self.obj().add_controller(drop_target.clone());
+
+        (drag_source, drop_target)
+    }
+
+    fn setup_drag_source_listener(&self, drag_source: DragSource) {
         let board = Arc::new(Mutex::new(self.obj().clone()));
         let image_manager = Arc::clone(&self.image_manager);
         let drag_source_2 = Rc::clone(&self.drag_source);
@@ -141,7 +157,9 @@ impl Board {
                 None
             }
         });
+    }
 
+    fn setup_drop_target_listener(&self, drop_target: DropTarget) {
         let board_2 = Arc::new(Mutex::new(self.obj().clone()));
         let start_pos_2 = Rc::clone(&self.start_pos);
         drop_target.connect_drop(move |_drop_target, value, x, y| {
@@ -158,14 +176,7 @@ impl Board {
             }
             true
         });
-
         drop_target.connect_accept(move |_drop_target, _drop| true);
-
-        self.obj().add_controller(drag_source.clone());
-        self.obj().add_controller(drop_target.clone());
-
-        self.obj().set_drag_source(drag_source.clone());
-        self.obj().set_drop_target(drop_target.clone());
     }
 }
 

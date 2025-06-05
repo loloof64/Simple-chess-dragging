@@ -1,9 +1,11 @@
-use gtk::cairo;
 use gtk::gdk::prelude::GdkCairoContextExt;
 use gtk::glib;
 use gtk::prelude::{DrawingAreaExt, DrawingAreaExtManual, WidgetExt};
 use gtk::subclass::prelude::*;
+use gtk::{DragSource, DropTarget, cairo};
 
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use super::image_manager::ImageManager;
@@ -16,6 +18,9 @@ const PERU: (f64, f64, f64) = (0.80, 0.52, 0.25);
 pub struct Board {
     pub image_manager: Arc<Mutex<ImageManager>>,
     pub cells_values: Arc<Mutex<[[char; 2]; 2]>>,
+    pub drag_source: Rc<RefCell<Option<DragSource>>>,
+    pub drop_target: Rc<RefCell<Option<DropTarget>>>,
+    pub cell_size: Cell<f64>,
 }
 
 impl Board {}
@@ -30,29 +35,43 @@ impl ObjectSubclass for Board {
 impl ObjectImpl for Board {
     fn constructed(&self) {
         self.parent_constructed();
+
+        // Default size
         self.obj()
             .set_size_request(DEFAULT_PIECE_SIZE as i32 * 2, DEFAULT_PIECE_SIZE as i32 * 2);
+
         let image_manager = Arc::clone(&self.image_manager);
         let cell_values = Arc::clone(&self.cells_values);
         let cell_values_2 = Arc::clone(&self.cells_values);
+
+        // Draw board
         self.obj().set_draw_func(move |_area, ctx, width, height| {
             let cell_values = cell_values_2.lock().unwrap();
             let piece_location = if cell_values[0][0] == 'n' {
                 (0, 0)
             } else if cell_values[0][1] == 'n' {
-                (0,1)
+                (0, 1)
             } else if cell_values[1][0] == 'n' {
-                (1,0)
+                (1, 0)
             } else if cell_values[1][1] == 'n' {
-                (1,1)
+                (1, 1)
             } else {
                 (u8::MAX, u8::MAX)
             };
-            draw_content(ctx, width, height, Arc::clone(&image_manager), piece_location);
+            draw_content(
+                ctx,
+                width,
+                height,
+                Arc::clone(&image_manager),
+                piece_location,
+            );
         });
+
+        // Default piece location
         let mut cell_values = cell_values.lock().unwrap();
         cell_values[0][0] = 'n';
 
+        // Adapt size on resize
         let board = Arc::new(Mutex::new(self.obj().clone()));
         self.obj().connect_resize(move |_board, w, h| {
             let width = w as u32;
@@ -61,7 +80,53 @@ impl ObjectImpl for Board {
             let cell_size = minimum_size as f64 / 2f64;
             if let Ok(mut board) = board.lock() {
                 board.update_image_size(cell_size as u32);
+                board.update_cell_size(cell_size);
             }
+        });
+
+        // Drag and drop
+        let drag_source = DragSource::builder()
+            .actions(gtk::gdk::DragAction::MOVE)
+            .build();
+        let drop_target = DropTarget::builder()
+            .actions(gtk::gdk::DragAction::MOVE)
+            .formats(&gtk::gdk::ContentFormats::new(&["text/plain"]))
+            .build();
+        self.obj().add_controller(drag_source.clone());
+        self.obj().add_controller(drop_target.clone());
+
+        self.obj().set_drag_source(drag_source.clone());
+        self.obj().set_drop_target(drop_target.clone());
+
+        let board_2 = Arc::new(Mutex::new(self.obj().clone()));
+        drag_source.connect_prepare(move |_drag_source, x, y| {
+            if let Ok(board) = board_2.lock() {
+                let cell_size = board.get_cell_size();
+                let col = (x as f64 / cell_size) as u8;
+                let row = (y as f64 / cell_size) as u8;
+                let piece_value = board.get_value_at(col, row);
+                if piece_value == 'n' {
+                    let value = glib::Value::from(&piece_value.to_string());
+                    Some(gtk::gdk::ContentProvider::for_value(&value))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+
+        let board_3 = Arc::new(Mutex::new(self.obj().clone()));
+        drop_target.connect_drop(move |_drop_target, value, x, y| {
+            if let Ok(board) = board_3.lock() {
+                let cell_size = board.get_cell_size();
+                let col = (x as f64 / cell_size) as u8;
+                let row = (y as f64 / cell_size) as u8;
+                println!("Dropping at pointer ({x}, {y})");
+                println!("Cell is ({col}, {row})");
+                println!("Value is {value:?}");
+            }
+            true
         });
     }
 }
@@ -102,13 +167,16 @@ fn draw_piece(
     ctx: &cairo::Context,
     image_manager: Arc<Mutex<ImageManager>>,
     piece_location: (u8, u8),
-    cell_size: f64
+    cell_size: f64,
 ) {
     let image_manager = image_manager.lock().unwrap();
     let piece_pixbuf = image_manager.get_image_clone();
 
     ctx.save().unwrap();
-    ctx.translate(piece_location.0 as f64 * cell_size, piece_location.1 as f64 * cell_size);
+    ctx.translate(
+        piece_location.1 as f64 * cell_size,
+        piece_location.0 as f64 * cell_size,
+    );
     ctx.set_source_pixbuf(&piece_pixbuf, 0.0, 0.0);
     ctx.paint().unwrap();
     ctx.restore().unwrap();

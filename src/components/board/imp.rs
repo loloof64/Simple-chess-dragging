@@ -104,6 +104,7 @@ impl ObjectImpl for Board {
         drag_source.connect_prepare(move |_drag_source, x, y| {
             if let Ok(board) = board_2.lock() {
                 let cell_size = board.get_cell_size();
+                let half_cell_size = (cell_size / 2.0) as i32;
                 let col = (x as f64 / cell_size) as u8;
                 let row = (y as f64 / cell_size) as u8;
                 let piece_value = board.get_value_at(col, row);
@@ -130,7 +131,7 @@ impl ObjectImpl for Board {
                         pixbuf.rowstride() as usize,
                     );
                     if let Some(ref drag_source) = *drag_source_2.borrow_mut() {
-                        drag_source.set_icon(Some(&texture), 0, 0);
+                        drag_source.set_icon(Some(&texture), half_cell_size, half_cell_size);
                     }
 
                     Some(content_provider)

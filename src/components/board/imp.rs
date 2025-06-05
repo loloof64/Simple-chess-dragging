@@ -15,6 +15,7 @@ const PERU: (f64, f64, f64) = (0.80, 0.52, 0.25);
 #[derive(Default)]
 pub struct Board {
     pub image_manager: Arc<Mutex<ImageManager>>,
+    pub cells_values: Arc<Mutex<[[char; 2]; 2]>>,
 }
 
 impl Board {}
@@ -32,9 +33,25 @@ impl ObjectImpl for Board {
         self.obj()
             .set_size_request(DEFAULT_PIECE_SIZE as i32 * 2, DEFAULT_PIECE_SIZE as i32 * 2);
         let image_manager = Arc::clone(&self.image_manager);
+        let cell_values = Arc::clone(&self.cells_values);
+        let cell_values_2 = Arc::clone(&self.cells_values);
         self.obj().set_draw_func(move |_area, ctx, width, height| {
-            draw_content(ctx, width, height, Arc::clone(&image_manager))
+            let cell_values = cell_values_2.lock().unwrap();
+            let piece_location = if cell_values[0][0] == 'n' {
+                (0, 0)
+            } else if cell_values[0][1] == 'n' {
+                (0,1)
+            } else if cell_values[1][0] == 'n' {
+                (1,0)
+            } else if cell_values[1][1] == 'n' {
+                (1,1)
+            } else {
+                (u8::MAX, u8::MAX)
+            };
+            draw_content(ctx, width, height, Arc::clone(&image_manager), piece_location);
         });
+        let mut cell_values = cell_values.lock().unwrap();
+        cell_values[0][0] = 'n';
 
         let board = Arc::new(Mutex::new(self.obj().clone()));
         self.obj().connect_resize(move |_board, w, h| {
@@ -58,6 +75,7 @@ fn draw_content(
     width: i32,
     height: i32,
     image_manager: Arc<Mutex<ImageManager>>,
+    piece_location: (u8, u8),
 ) {
     let minimum_size = width.min(height);
     let cell_size = minimum_size as f64 / 2f64;
@@ -71,22 +89,27 @@ fn draw_content(
         cell_size as f64,
         NAVAJO_WHITE,
     );
-    draw_piece(ctx, 0.0, 0.0, image_manager);
+    draw_piece(ctx, image_manager, piece_location, cell_size);
 }
 
 fn draw_single_cell(ctx: &cairo::Context, x: f64, y: f64, size: f64, color: (f64, f64, f64)) {
     ctx.set_source_rgb(color.0, color.1, color.2);
     ctx.rectangle(x, y, size, size);
-    ctx.fill().expect("failed to fill cell");
+    ctx.fill().unwrap();
 }
 
-fn draw_piece(ctx: &cairo::Context, x: f64, y: f64, image_manager: Arc<Mutex<ImageManager>>) {
+fn draw_piece(
+    ctx: &cairo::Context,
+    image_manager: Arc<Mutex<ImageManager>>,
+    piece_location: (u8, u8),
+    cell_size: f64
+) {
     let image_manager = image_manager.lock().unwrap();
     let piece_pixbuf = image_manager.get_image_clone();
 
     ctx.save().unwrap();
-    ctx.translate(x, y);
+    ctx.translate(piece_location.0 as f64 * cell_size, piece_location.1 as f64 * cell_size);
     ctx.set_source_pixbuf(&piece_pixbuf, 0.0, 0.0);
-    ctx.paint().expect("failed to paint piece");
+    ctx.paint().unwrap();
     ctx.restore().unwrap();
 }

@@ -38,7 +38,11 @@ impl Board {
         *self.imp().drop_target.borrow_mut() = Some(drop_target);
     }
 
-    pub fn get_value_at(&self, col: u8, row: u8) -> char {
+    pub fn get_value_at(&self, row: u8, col: u8) -> char {
         self.imp().cells_values.lock().unwrap()[row as usize][col as usize]
+    }
+
+    pub fn set_value_at(&self, row: u8, col: u8, value: char) {
+        self.imp().cells_values.lock().unwrap()[row as usize][col as usize] = value;
     }
 }

@@ -1,5 +1,6 @@
 use gtk::gdk::prelude::GdkCairoContextExt;
-use gtk::glib;
+use gtk::gdk::ContentProvider;
+use gtk::glib::{self, Type};
 use gtk::prelude::{DrawingAreaExt, DrawingAreaExtManual, WidgetExt};
 use gtk::subclass::prelude::*;
 use gtk::{DragSource, DropTarget, cairo};
@@ -21,6 +22,8 @@ pub struct Board {
     pub drag_source: Rc<RefCell<Option<DragSource>>>,
     pub drop_target: Rc<RefCell<Option<DropTarget>>>,
     pub cell_size: Cell<f64>,
+    pub start_pos: Rc<RefCell<Option<(u8, u8)>>>,
+    pub end_pos: Rc<RefCell<Option<(u8, u8)>>>,
 }
 
 impl Board {}
@@ -89,28 +92,26 @@ impl ObjectImpl for Board {
             .actions(gtk::gdk::DragAction::MOVE)
             .build();
         let drop_target = DropTarget::builder()
-            .actions(gtk::gdk::DragAction::MOVE)
-            .formats(&gtk::gdk::ContentFormats::new(&["text/plain"]))
+            .actions(gtk::gdk::DragAction::MOVE)    
             .build();
-        self.obj().add_controller(drag_source.clone());
-        self.obj().add_controller(drop_target.clone());
-
-        self.obj().set_drag_source(drag_source.clone());
-        self.obj().set_drop_target(drop_target.clone());
+        drop_target.set_types(&[Type::STRING]);
 
         let board_2 = Arc::new(Mutex::new(self.obj().clone()));
         let image_manager_2 = Arc::clone(&self.image_manager);
         let drag_source_2 = Rc::clone(&self.drag_source);
+        let start_pos_1 = Rc::clone(&self.start_pos);
         drag_source.connect_prepare(move |_drag_source, x, y| {
             if let Ok(board) = board_2.lock() {
                 let cell_size = board.get_cell_size();
                 let half_cell_size = (cell_size / 2.0) as i32;
                 let col = (x as f64 / cell_size) as u8;
                 let row = (y as f64 / cell_size) as u8;
-                let piece_value = board.get_value_at(col, row);
+                let piece_value = board.get_value_at(row, col);
                 if piece_value == 'n' {
-                    let value = glib::Value::from(&piece_value.to_string());
-                    let content_provider = gtk::gdk::ContentProvider::for_value(&value);
+                    start_pos_1.replace(Some((row, col)));
+                    let text = piece_value.to_string();
+                    let bytes = glib::Bytes::from(&text.as_ref());
+                    let content_provider = ContentProvider::for_bytes("text/plain", &bytes);
 
                     let image_manager = image_manager_2.lock().unwrap();
                     let pixbuf = image_manager.get_image_clone();
@@ -144,17 +145,31 @@ impl ObjectImpl for Board {
         });
 
         let board_3 = Arc::new(Mutex::new(self.obj().clone()));
+        let start_pos_2 = Rc::clone(&self.start_pos);
         drop_target.connect_drop(move |_drop_target, value, x, y| {
             if let Ok(board) = board_3.lock() {
+                let start_pos = start_pos_2.borrow().unwrap();
                 let cell_size = board.get_cell_size();
                 let col = (x as f64 / cell_size) as u8;
                 let row = (y as f64 / cell_size) as u8;
-                println!("Dropping at pointer ({x}, {y})");
-                println!("Cell is ({col}, {row})");
-                println!("Value is {value:?}");
+                let piece_value = value.get::<String>().unwrap().chars().next().unwrap();
+                board.set_value_at(row, col, piece_value);
+                board.set_value_at(start_pos.0, start_pos.1, 0 as char);
+                
+                start_pos_2.replace(None);
             }
             true
         });
+
+        drop_target.connect_accept(move |_drop_target, _drop| {
+            true
+        });
+
+        self.obj().add_controller(drag_source.clone());
+        self.obj().add_controller(drop_target.clone());
+
+        self.obj().set_drag_source(drag_source.clone());
+        self.obj().set_drop_target(drop_target.clone());
     }
 }
 

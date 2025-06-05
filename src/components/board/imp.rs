@@ -160,19 +160,19 @@ impl Board {
     }
 
     fn setup_drop_target_listener(&self, drop_target: DropTarget) {
-        let board_2 = Arc::new(Mutex::new(self.obj().clone()));
-        let start_pos_2 = Rc::clone(&self.start_pos);
+        let board = Arc::new(Mutex::new(self.obj().clone()));
+        let start_pos = Rc::clone(&self.start_pos);
         drop_target.connect_drop(move |_drop_target, value, x, y| {
-            if let Ok(board) = board_2.lock() {
-                let start_pos = start_pos_2.borrow().unwrap();
+            if let Ok(board) = board.lock() {
+                let start_pos_2 = start_pos.borrow().unwrap();
                 let cell_size = board.get_cell_size();
                 let col = (x as f64 / cell_size) as u8;
                 let row = (y as f64 / cell_size) as u8;
                 let piece_value = value.get::<String>().unwrap().chars().next().unwrap();
                 board.set_value_at(row, col, piece_value);
-                board.set_value_at(start_pos.0, start_pos.1, 0 as char);
+                board.set_value_at(start_pos_2.0, start_pos_2.1, 0 as char);
 
-                start_pos_2.replace(None);
+                start_pos.replace(None);
             }
             true
         });

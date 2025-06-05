@@ -99,6 +99,8 @@ impl ObjectImpl for Board {
         self.obj().set_drop_target(drop_target.clone());
 
         let board_2 = Arc::new(Mutex::new(self.obj().clone()));
+        let image_manager_2 = Arc::clone(&self.image_manager);
+        let drag_source_2 = Rc::clone(&self.drag_source);
         drag_source.connect_prepare(move |_drag_source, x, y| {
             if let Ok(board) = board_2.lock() {
                 let cell_size = board.get_cell_size();
@@ -107,7 +109,31 @@ impl ObjectImpl for Board {
                 let piece_value = board.get_value_at(col, row);
                 if piece_value == 'n' {
                     let value = glib::Value::from(&piece_value.to_string());
-                    Some(gtk::gdk::ContentProvider::for_value(&value))
+                    let content_provider = gtk::gdk::ContentProvider::for_value(&value);
+
+                    let image_manager = image_manager_2.lock().unwrap();
+                    let pixbuf = image_manager.get_image_clone();
+                    let format = if pixbuf.has_alpha() {
+                        gtk::gdk::MemoryFormat::R8g8b8a8
+                    } else {
+                        gtk::gdk::MemoryFormat::R8g8b8
+                    };
+
+                    let pixels = pixbuf.read_pixel_bytes();
+                    let bytes = glib::Bytes::from_owned(pixels);
+
+                    let texture = gtk::gdk::MemoryTexture::new(
+                        pixbuf.width(),
+                        pixbuf.height(),
+                        format,
+                        &bytes,
+                        pixbuf.rowstride() as usize,
+                    );
+                    if let Some(ref drag_source) = *drag_source_2.borrow_mut() {
+                        drag_source.set_icon(Some(&texture), 0, 0);
+                    }
+
+                    Some(content_provider)
                 } else {
                     None
                 }

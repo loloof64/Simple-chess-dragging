@@ -26,28 +26,16 @@ pub struct Board {
     pub end_pos: Rc<RefCell<Option<(u8, u8)>>>,
 }
 
-impl Board {}
-
-#[glib::object_subclass]
-impl ObjectSubclass for Board {
-    const NAME: &'static str = "SimpleChessDraggingBoard";
-    type Type = super::Board;
-    type ParentType = gtk::DrawingArea;
-}
-
-impl ObjectImpl for Board {
-    fn constructed(&self) {
-        self.parent_constructed();
-
-        // Default size
+impl Board {
+    fn set_default_size(&self) {
         self.obj()
             .set_size_request(DEFAULT_PIECE_SIZE as i32 * 2, DEFAULT_PIECE_SIZE as i32 * 2);
+    }
 
+    fn set_draw_function(&self) {
         let image_manager = Arc::clone(&self.image_manager);
-        let cell_values = Arc::clone(&self.cells_values);
         let cell_values_2 = Arc::clone(&self.cells_values);
 
-        // Draw board
         let start_pos_1 = Rc::clone(&self.start_pos);
         self.obj().set_draw_func(move |_area, ctx, width, height| {
             let cell_values = cell_values_2.lock().unwrap();
@@ -75,12 +63,15 @@ impl ObjectImpl for Board {
                 piece_location,
             );
         });
+    }
 
-        // Default piece location
+    fn set_default_piece_location(&self) {
+        let cell_values = Arc::clone(&self.cells_values);
         let mut cell_values = cell_values.lock().unwrap();
         cell_values[0][0] = 'n';
+    }
 
-        // Adapt size on resize
+    fn set_resize_function(&self) {
         let board = Arc::new(Mutex::new(self.obj().clone()));
         self.obj().connect_resize(move |_board, w, h| {
             let width = w as u32;
@@ -92,8 +83,9 @@ impl ObjectImpl for Board {
                 board.update_cell_size(cell_size);
             }
         });
+    }
 
-        // Drag and drop
+    fn setup_drag_and_drop(&self) {
         let drag_source = DragSource::builder()
             .actions(gtk::gdk::DragAction::MOVE)
             .build();
@@ -174,6 +166,25 @@ impl ObjectImpl for Board {
 
         self.obj().set_drag_source(drag_source.clone());
         self.obj().set_drop_target(drop_target.clone());
+    }
+}
+
+#[glib::object_subclass]
+impl ObjectSubclass for Board {
+    const NAME: &'static str = "SimpleChessDraggingBoard";
+    type Type = super::Board;
+    type ParentType = gtk::DrawingArea;
+}
+
+impl ObjectImpl for Board {
+    fn constructed(&self) {
+        self.parent_constructed();
+
+        self.set_default_size();
+        self.set_draw_function();
+        self.set_default_piece_location();
+        self.set_resize_function();
+        self.setup_drag_and_drop();
     }
 }
 

@@ -34,11 +34,11 @@ impl Board {
 
     fn set_draw_function(&self) {
         let image_manager = Arc::clone(&self.image_manager);
-        let cell_values_2 = Arc::clone(&self.cells_values);
+        let cell_values = Arc::clone(&self.cells_values);
 
-        let start_pos_1 = Rc::clone(&self.start_pos);
+        let start_pos = Rc::clone(&self.start_pos);
         self.obj().set_draw_func(move |_area, ctx, width, height| {
-            let cell_values = cell_values_2.lock().unwrap();
+            let cell_values = cell_values.lock().unwrap();
             let piece_location = if cell_values[0][0] == 'n' {
                 (0, 0)
             } else if cell_values[0][1] == 'n' {
@@ -50,8 +50,8 @@ impl Board {
             } else {
                 (u8::MAX, u8::MAX)
             };
-            let start_pos_1 = *start_pos_1.borrow();
-            let piece_location = match start_pos_1 {
+            let start_pos = *start_pos.borrow();
+            let piece_location = match start_pos {
                 None => Some(piece_location),
                 _ => None,
             };
@@ -94,24 +94,24 @@ impl Board {
             .build();
         drop_target.set_types(&[Type::STRING]);
 
-        let board_2 = Arc::new(Mutex::new(self.obj().clone()));
-        let image_manager_2 = Arc::clone(&self.image_manager);
+        let board = Arc::new(Mutex::new(self.obj().clone()));
+        let image_manager = Arc::clone(&self.image_manager);
         let drag_source_2 = Rc::clone(&self.drag_source);
-        let start_pos_2 = Rc::clone(&self.start_pos);
+        let start_pos = Rc::clone(&self.start_pos);
         drag_source.connect_prepare(move |_drag_source, x, y| {
-            if let Ok(board) = board_2.lock() {
+            if let Ok(board) = board.lock() {
                 let cell_size = board.get_cell_size();
                 let half_cell_size = (cell_size / 2.0) as i32;
                 let col = (x as f64 / cell_size) as u8;
                 let row = (y as f64 / cell_size) as u8;
                 let piece_value = board.get_value_at(row, col);
                 if piece_value == 'n' {
-                    start_pos_2.replace(Some((row, col)));
+                    start_pos.replace(Some((row, col)));
                     let text = piece_value.to_string();
                     let bytes = glib::Bytes::from(&text.as_ref());
                     let content_provider = ContentProvider::for_bytes("text/plain", &bytes);
 
-                    let image_manager = image_manager_2.lock().unwrap();
+                    let image_manager = image_manager.lock().unwrap();
                     let pixbuf = image_manager.get_image_clone();
                     let format = if pixbuf.has_alpha() {
                         gtk::gdk::MemoryFormat::R8g8b8a8
@@ -142,11 +142,11 @@ impl Board {
             }
         });
 
-        let board_3 = Arc::new(Mutex::new(self.obj().clone()));
-        let start_pos_3 = Rc::clone(&self.start_pos);
+        let board_2 = Arc::new(Mutex::new(self.obj().clone()));
+        let start_pos_2 = Rc::clone(&self.start_pos);
         drop_target.connect_drop(move |_drop_target, value, x, y| {
-            if let Ok(board) = board_3.lock() {
-                let start_pos = start_pos_3.borrow().unwrap();
+            if let Ok(board) = board_2.lock() {
+                let start_pos = start_pos_2.borrow().unwrap();
                 let cell_size = board.get_cell_size();
                 let col = (x as f64 / cell_size) as u8;
                 let row = (y as f64 / cell_size) as u8;
@@ -154,7 +154,7 @@ impl Board {
                 board.set_value_at(row, col, piece_value);
                 board.set_value_at(start_pos.0, start_pos.1, 0 as char);
 
-                start_pos_3.replace(None);
+                start_pos_2.replace(None);
             }
             true
         });

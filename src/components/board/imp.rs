@@ -1,5 +1,5 @@
-use gtk::gdk::prelude::GdkCairoContextExt;
 use gtk::gdk::ContentProvider;
+use gtk::gdk::prelude::GdkCairoContextExt;
 use gtk::glib::{self, Type};
 use gtk::prelude::{DrawingAreaExt, DrawingAreaExtManual, WidgetExt};
 use gtk::subclass::prelude::*;
@@ -48,6 +48,7 @@ impl ObjectImpl for Board {
         let cell_values_2 = Arc::clone(&self.cells_values);
 
         // Draw board
+        let start_pos_1 = Rc::clone(&self.start_pos);
         self.obj().set_draw_func(move |_area, ctx, width, height| {
             let cell_values = cell_values_2.lock().unwrap();
             let piece_location = if cell_values[0][0] == 'n' {
@@ -60,6 +61,11 @@ impl ObjectImpl for Board {
                 (1, 1)
             } else {
                 (u8::MAX, u8::MAX)
+            };
+            let start_pos_1 = *start_pos_1.borrow();
+            let piece_location = match start_pos_1 {
+                None => Some(piece_location),
+                _ => None,
             };
             draw_content(
                 ctx,
@@ -92,14 +98,14 @@ impl ObjectImpl for Board {
             .actions(gtk::gdk::DragAction::MOVE)
             .build();
         let drop_target = DropTarget::builder()
-            .actions(gtk::gdk::DragAction::MOVE)    
+            .actions(gtk::gdk::DragAction::MOVE)
             .build();
         drop_target.set_types(&[Type::STRING]);
 
         let board_2 = Arc::new(Mutex::new(self.obj().clone()));
         let image_manager_2 = Arc::clone(&self.image_manager);
         let drag_source_2 = Rc::clone(&self.drag_source);
-        let start_pos_1 = Rc::clone(&self.start_pos);
+        let start_pos_2 = Rc::clone(&self.start_pos);
         drag_source.connect_prepare(move |_drag_source, x, y| {
             if let Ok(board) = board_2.lock() {
                 let cell_size = board.get_cell_size();
@@ -108,7 +114,7 @@ impl ObjectImpl for Board {
                 let row = (y as f64 / cell_size) as u8;
                 let piece_value = board.get_value_at(row, col);
                 if piece_value == 'n' {
-                    start_pos_1.replace(Some((row, col)));
+                    start_pos_2.replace(Some((row, col)));
                     let text = piece_value.to_string();
                     let bytes = glib::Bytes::from(&text.as_ref());
                     let content_provider = ContentProvider::for_bytes("text/plain", &bytes);
@@ -145,25 +151,23 @@ impl ObjectImpl for Board {
         });
 
         let board_3 = Arc::new(Mutex::new(self.obj().clone()));
-        let start_pos_2 = Rc::clone(&self.start_pos);
+        let start_pos_3 = Rc::clone(&self.start_pos);
         drop_target.connect_drop(move |_drop_target, value, x, y| {
             if let Ok(board) = board_3.lock() {
-                let start_pos = start_pos_2.borrow().unwrap();
+                let start_pos = start_pos_3.borrow().unwrap();
                 let cell_size = board.get_cell_size();
                 let col = (x as f64 / cell_size) as u8;
                 let row = (y as f64 / cell_size) as u8;
                 let piece_value = value.get::<String>().unwrap().chars().next().unwrap();
                 board.set_value_at(row, col, piece_value);
                 board.set_value_at(start_pos.0, start_pos.1, 0 as char);
-                
-                start_pos_2.replace(None);
+
+                start_pos_3.replace(None);
             }
             true
         });
 
-        drop_target.connect_accept(move |_drop_target, _drop| {
-            true
-        });
+        drop_target.connect_accept(move |_drop_target, _drop| true);
 
         self.obj().add_controller(drag_source.clone());
         self.obj().add_controller(drop_target.clone());
@@ -182,7 +186,7 @@ fn draw_content(
     width: i32,
     height: i32,
     image_manager: Arc<Mutex<ImageManager>>,
-    piece_location: (u8, u8),
+    piece_location: Option<(u8, u8)>,
 ) {
     let minimum_size = width.min(height);
     let cell_size = minimum_size as f64 / 2f64;
@@ -196,7 +200,9 @@ fn draw_content(
         cell_size as f64,
         NAVAJO_WHITE,
     );
-    draw_piece(ctx, image_manager, piece_location, cell_size);
+    if let Some(piece_location) = piece_location {
+        draw_piece(ctx, image_manager, piece_location, cell_size);
+    }
 }
 
 fn draw_single_cell(ctx: &cairo::Context, x: f64, y: f64, size: f64, color: (f64, f64, f64)) {

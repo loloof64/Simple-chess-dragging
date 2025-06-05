@@ -1,5 +1,6 @@
-use gtk::gdk::ContentProvider;
 use gtk::gdk::prelude::GdkCairoContextExt;
+use gtk::gdk::{ContentProvider, MemoryTexture};
+use gtk::gdk_pixbuf::Pixbuf;
 use gtk::glib::{self, Type};
 use gtk::prelude::{DrawingAreaExt, DrawingAreaExtManual, WidgetExt};
 use gtk::subclass::prelude::*;
@@ -122,34 +123,25 @@ impl Board {
                 let row = (y as f64 / cell_size) as u8;
                 let piece_value = board.get_value_at(row, col);
                 if piece_value == 'n' {
+                    // update start position
                     start_pos.replace(Some((row, col)));
+                    // set transfered data
                     let text = piece_value.to_string();
                     let bytes = glib::Bytes::from(&text.as_ref());
                     let content_provider = ContentProvider::for_bytes("text/plain", &bytes);
 
+                    // get drag and drop icon
                     let image_manager = image_manager.lock().unwrap();
-                    let pixbuf = image_manager.get_image_clone();
-                    let format = if pixbuf.has_alpha() {
-                        gtk::gdk::MemoryFormat::R8g8b8a8
-                    } else {
-                        gtk::gdk::MemoryFormat::R8g8b8
-                    };
+                    let original_image = image_manager.get_image_clone();
+                    let texture = Board::generate_drag_icon(original_image);
 
-                    let pixels = pixbuf.read_pixel_bytes();
-                    let bytes = glib::Bytes::from_owned(pixels);
-
-                    let texture = gtk::gdk::MemoryTexture::new(
-                        pixbuf.width(),
-                        pixbuf.height(),
-                        format,
-                        &bytes,
-                        pixbuf.rowstride() as usize,
-                    );
+                    // finalize setup
                     if let Some(ref drag_source) = *drag_source_2.borrow_mut() {
                         drag_source.set_icon(Some(&texture), half_cell_size, half_cell_size);
+                        Some(content_provider)
+                    } else {
+                        None
                     }
-
-                    Some(content_provider)
                 } else {
                     None
                 }
@@ -177,6 +169,25 @@ impl Board {
             true
         });
         drop_target.connect_accept(move |_drop_target, _drop| true);
+    }
+
+    fn generate_drag_icon(original_image: Pixbuf) -> MemoryTexture {
+        let format = if original_image.has_alpha() {
+            gtk::gdk::MemoryFormat::R8g8b8a8
+        } else {
+            gtk::gdk::MemoryFormat::R8g8b8
+        };
+
+        let pixels = original_image.read_pixel_bytes();
+        let bytes = glib::Bytes::from_owned(pixels);
+
+        gtk::gdk::MemoryTexture::new(
+            original_image.width(),
+            original_image.height(),
+            format,
+            &bytes,
+            original_image.rowstride() as usize,
+        )
     }
 }
 

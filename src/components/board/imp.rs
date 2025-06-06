@@ -154,6 +154,7 @@ impl Board {
     fn setup_drop_target_listener(&self, drop_target: DropTarget) {
         let board = Arc::new(Mutex::new(self.obj().clone()));
         let start_pos = Rc::clone(&self.start_pos);
+        let end_pos = Rc::clone(&self.end_pos);
         drop_target.connect_drop(move |_drop_target, value, x, y| {
             if let Ok(board) = board.lock() {
                 let start_pos_2 = start_pos.borrow().unwrap();
@@ -161,12 +162,13 @@ impl Board {
                 let col = (x as f64 / cell_size) as u8;
                 let row = (y as f64 / cell_size) as u8;
                 let piece_value = value.get::<String>().unwrap().chars().next().unwrap();
-                
+
                 // if same location, cancel drag and drop
                 let same_location = start_pos_2.0 == row && start_pos_2.1 == col;
                 if same_location {
                     board.set_value_at(start_pos_2.0, start_pos_2.1, piece_value);
                     start_pos.replace(None);
+                    end_pos.replace(None);
                     return true;
                 }
                 // else validate drag and drop
@@ -174,8 +176,21 @@ impl Board {
                 board.set_value_at(start_pos_2.0, start_pos_2.1, 0 as char);
 
                 start_pos.replace(None);
+                end_pos.replace(None);
             }
             true
+        });
+        let board_2 = Arc::new(Mutex::new(self.obj().clone()));
+        let end_pos = Rc::clone(&self.end_pos);
+        drop_target.connect_motion(move |_drop_target, x, y| {
+            if let Ok(board) = board_2.lock() {
+                let cell_size = board.get_cell_size();
+                let col = (x as f64 / cell_size) as u8;
+                let row = (y as f64 / cell_size) as u8;
+                end_pos.replace(Some((row, col)));
+                board.queue_draw();
+            }
+            gtk::gdk::DragAction::MOVE
         });
         drop_target.connect_accept(move |_drop_target, _drop| true);
     }

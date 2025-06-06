@@ -18,18 +18,28 @@ pub fn draw_content(
 ) {
     let minimum_size = width.min(height);
     let cell_size = minimum_size as f64 / 2f64;
-    draw_single_cell(ctx, 0.0, 0.0, cell_size as f64, NAVAJO_WHITE);
-    draw_single_cell(ctx, cell_size as f64, 0.0, cell_size as f64, PERU);
-    draw_single_cell(ctx, 0.0, cell_size as f64, cell_size as f64, PERU);
-    draw_single_cell(
-        ctx,
-        cell_size as f64,
-        cell_size as f64,
-        cell_size as f64,
-        NAVAJO_WHITE,
-    );
+    draw_cells(ctx, cell_size);
     if let Some(piece_location) = piece_location {
         draw_piece(ctx, image_manager, piece_location, cell_size);
+    }
+}
+
+fn draw_cells(ctx: &cairo::Context, cell_size: f64) {
+    for row in 0..2 {
+        for col in 0..2 {
+            let background_color = if (row + col) % 2 == 0 {
+                NAVAJO_WHITE
+            } else {
+                PERU
+            };
+            draw_single_cell(
+                ctx,
+                col as f64 * cell_size,
+                row as f64 * cell_size,
+                cell_size,
+                background_color,
+            );
+        }
     }
 }
 

@@ -1,6 +1,9 @@
 # Simple chess dragging
 
+A tiny toy project.
 Simply move a chess piece freely on a 2x2 board.
+
+Built with Rust and Gtk4-rs.
 
 ## Credits
 

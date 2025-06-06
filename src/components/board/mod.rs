@@ -1,5 +1,6 @@
 mod imp;
 mod image_manager;
+mod drawing;
 
 use std::sync::Arc;
 use glib::Object;

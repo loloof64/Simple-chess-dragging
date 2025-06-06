@@ -34,6 +34,7 @@ impl Board {
         let cell_values = Arc::clone(&self.cells_values);
 
         let start_pos = Rc::clone(&self.start_pos);
+        let end_pos = Rc::clone(&self.end_pos);
         self.obj().set_draw_func(move |_area, ctx, width, height| {
             let cell_values = cell_values.lock().unwrap();
             let piece_location = if cell_values[0][0] == 'n' {
@@ -48,6 +49,7 @@ impl Board {
                 (u8::MAX, u8::MAX)
             };
             let start_pos = *start_pos.borrow();
+            let end_pos = *end_pos.borrow();
             let piece_location = match start_pos {
                 None => Some(piece_location),
                 _ => None,
@@ -58,6 +60,8 @@ impl Board {
                 height,
                 Arc::clone(&image_manager),
                 piece_location,
+                start_pos,
+                end_pos,
             );
         });
     }

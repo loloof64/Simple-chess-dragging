@@ -161,6 +161,15 @@ impl Board {
                 let col = (x as f64 / cell_size) as u8;
                 let row = (y as f64 / cell_size) as u8;
                 let piece_value = value.get::<String>().unwrap().chars().next().unwrap();
+                
+                // if same location, cancel drag and drop
+                let same_location = start_pos_2.0 == row && start_pos_2.1 == col;
+                if same_location {
+                    board.set_value_at(start_pos_2.0, start_pos_2.1, piece_value);
+                    start_pos.replace(None);
+                    return true;
+                }
+                // else validate drag and drop
                 board.set_value_at(row, col, piece_value);
                 board.set_value_at(start_pos_2.0, start_pos_2.1, 0 as char);
 

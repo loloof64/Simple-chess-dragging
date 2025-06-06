@@ -1,4 +1,4 @@
-# Simple chess dragging
+# Simple chess dragging
 
 A tiny toy project.
 Simply move a chess piece freely on a 2x2 board.
